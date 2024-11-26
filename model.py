@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+# A ne pas modifier l'insfrastrucutre du générateur
 class Generator(nn.Module):
     def __init__(self, g_output_dim):
         super(Generator, self).__init__()       

@@ -1,4 +1,5 @@
 import torch 
+import torch.mps
 import torchvision
 import os
 import argparse
@@ -13,16 +14,22 @@ if __name__ == '__main__':
                       help="The batch size to use for training.")
     args = parser.parse_args()
 
-
+    # Set device
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+    elif torch.backends.mps.is_available() and torch.backends.mps.is_built():
+        device = torch.device('mps')
+    else:
+        device = torch.device('cpu')
 
 
     print('Model Loading...')
     # Model Pipeline
     mnist_dim = 784
 
-    model = Generator(g_output_dim = mnist_dim).cuda()
+    model = Generator(g_output_dim = mnist_dim).to(device)
     model = load_model(model, 'checkpoints')
-    model = torch.nn.DataParallel(model).cuda()
+    model = torch.nn.DataParallel(model).to(device)
     model.eval()
 
     print('Model loaded.')
@@ -35,7 +42,7 @@ if __name__ == '__main__':
     n_samples = 0
     with torch.no_grad():
         while n_samples<10000:
-            z = torch.randn(args.batch_size, 100).cuda()
+            z = torch.randn(args.batch_size, 100).to(device)
             x = model(z)
             x = x.reshape(args.batch_size, 28, 28)
             for k in range(x.shape[0]):

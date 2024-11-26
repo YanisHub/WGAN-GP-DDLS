@@ -1,26 +1,27 @@
-import torch
 import os
+import torch
 
 
+def D_train(x, G, D, D_optimizer, criterion, device):
+    # Move data to the appropriate device
+    x = x.to(device)
+    G = G.to(device)
+    D = D.to(device)
+    criterion = criterion.to(device)
 
-def D_train(x, G, D, D_optimizer, criterion):
     #=======================Train the discriminator=======================#
     D.zero_grad()
 
     # train discriminator on real
-    x_real, y_real = x, torch.ones(x.shape[0], 1)
-    x_real, y_real = x_real.cuda(), y_real.cuda()
-
+    x_real, y_real = x, torch.ones(x.shape[0], 1, device=device)
     D_output = D(x_real)
     D_real_loss = criterion(D_output, y_real)
     D_real_score = D_output
 
-    # train discriminator on facke
-    z = torch.randn(x.shape[0], 100).cuda()
-    x_fake, y_fake = G(z), torch.zeros(x.shape[0], 1).cuda()
-
-    D_output =  D(x_fake)
-    
+    # train discriminator on fake
+    z = torch.randn(x.shape[0], 100, device=device)
+    x_fake, y_fake = G(z), torch.zeros(x.shape[0], 1, device=device)
+    D_output = D(x_fake)
     D_fake_loss = criterion(D_output, y_fake)
     D_fake_score = D_output
 
@@ -29,15 +30,21 @@ def D_train(x, G, D, D_optimizer, criterion):
     D_loss.backward()
     D_optimizer.step()
         
-    return  D_loss.data.item()
+    return D_loss.data.item()
 
 
-def G_train(x, G, D, G_optimizer, criterion):
+def G_train(x, G, D, G_optimizer, criterion, device):
+    # Move data to the appropriate device
+    x = x.to(device)
+    G = G.to(device)
+    D = D.to(device)
+    criterion = criterion.to(device)
+
     #=======================Train the generator=======================#
     G.zero_grad()
 
-    z = torch.randn(x.shape[0], 100).cuda()
-    y = torch.ones(x.shape[0], 1).cuda()
+    z = torch.randn(x.shape[0], 100, device=device)
+    y = torch.ones(x.shape[0], 1, device=device)
                  
     G_output = G(z)
     D_output = D(G_output)
@@ -57,6 +64,6 @@ def save_models(G, D, folder):
 
 
 def load_model(G, folder):
-    ckpt = torch.load(os.path.join(folder,'G.pth'))
+    ckpt = torch.load(os.path.join(folder, 'G.pth'), map_location=torch.device('cpu') if not torch.cuda.is_available() else None)
     G.load_state_dict({k.replace('module.', ''): v for k, v in ckpt.items()})
     return G

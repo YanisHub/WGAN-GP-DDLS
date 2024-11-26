@@ -14,6 +14,9 @@ from utils import D_train, G_train, save_models
 
 
 if __name__ == '__main__':
+    
+    device = torch.device('mps')
+    
     parser = argparse.ArgumentParser(description='Train GAN.')
     parser.add_argument("--epochs", type=int, default=100,
                         help="Number of epochs for training.")
@@ -48,8 +51,8 @@ if __name__ == '__main__':
 
     print('Model Loading...')
     mnist_dim = 784
-    G = torch.nn.DataParallel(Generator(g_output_dim = mnist_dim)).cuda()
-    D = torch.nn.DataParallel(Discriminator(mnist_dim)).cuda()
+    G = torch.nn.DataParallel(Generator(g_output_dim = mnist_dim)).to(device)
+    D = torch.nn.DataParallel(Discriminator(mnist_dim)).to(device)
 
 
     # model = DataParallel(model).cuda()
@@ -71,8 +74,8 @@ if __name__ == '__main__':
     for epoch in trange(1, n_epoch+1, leave=True):           
         for batch_idx, (x, _) in enumerate(train_loader):
             x = x.view(-1, mnist_dim)
-            D_train(x, G, D, D_optimizer, criterion)
-            G_train(x, G, D, G_optimizer, criterion)
+            D_train(x, G, D, D_optimizer, criterion, device)
+            G_train(x, G, D, G_optimizer, criterion, device)
 
         if epoch % 10 == 0:
             save_models(G, D, 'checkpoints')
