@@ -1,4 +1,13 @@
-/.venv/
-samples
+venv/
 __pycache__
 data
+test_images
+FID.py
+evolution_DDLS
+DDLS_wgan
+samples_wgan
+samples_gan
+samples_wgan_ddls
+samples_gan_ddls
+checkpoints_WGAN
+checkpoints_wgan_adam

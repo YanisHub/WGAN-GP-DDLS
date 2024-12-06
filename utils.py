@@ -1,69 +1,110 @@
 import os
 import torch
-
-
-def D_train(x, G, D, D_optimizer, criterion, device):
-    # Move data to the appropriate device
-    x = x.to(device)
-    G = G.to(device)
-    D = D.to(device)
-    criterion = criterion.to(device)
-
-    #=======================Train the discriminator=======================#
-    D.zero_grad()
-
-    # train discriminator on real
-    x_real, y_real = x, torch.ones(x.shape[0], 1, device=device)
-    D_output = D(x_real)
-    D_real_loss = criterion(D_output, y_real)
-    D_real_score = D_output
-
-    # train discriminator on fake
-    z = torch.randn(x.shape[0], 100, device=device)
-    x_fake, y_fake = G(z), torch.zeros(x.shape[0], 1, device=device)
-    D_output = D(x_fake)
-    D_fake_loss = criterion(D_output, y_fake)
-    D_fake_score = D_output
-
-    # gradient backprop & optimize ONLY D's parameters
-    D_loss = D_real_loss + D_fake_loss
-    D_loss.backward()
-    D_optimizer.step()
-        
-    return D_loss.data.item()
-
-
-def G_train(x, G, D, G_optimizer, criterion, device):
-    # Move data to the appropriate device
-    x = x.to(device)
-    G = G.to(device)
-    D = D.to(device)
-    criterion = criterion.to(device)
-
-    #=======================Train the generator=======================#
-    G.zero_grad()
-
-    z = torch.randn(x.shape[0], 100, device=device)
-    y = torch.ones(x.shape[0], 1, device=device)
-                 
-    G_output = G(z)
-    D_output = D(G_output)
-    G_loss = criterion(D_output, y)
-
-    # gradient backprop & optimize ONLY G's parameters
-    G_loss.backward()
-    G_optimizer.step()
-        
-    return G_loss.data.item()
+import datetime
+import model as m
+import numpy as np
+from PIL import Image
+import matplotlib.pyplot as plt
+from torchvision import transforms
+from torchvision.utils import make_grid
 
 
 
-def save_models(G, D, folder):
-    torch.save(G.state_dict(), os.path.join(folder,'G.pth'))
-    torch.save(D.state_dict(), os.path.join(folder,'D.pth'))
+def plot_fake_data(fake_data, X_train, eps, epoch, path_to_save, sampling_mode = 'Langevin'):
+    plt.figure(figsize=(8, 8))
+    plt.xlim(-2., 2.)
+    plt.ylim(-2., 2.)
+    title = fr"Training data and {sampling_mode}"
+    plt.title(title, fontsize=20)
+    plt.scatter(X_train[:,:1], X_train[:,1:], alpha=0.5, color='gray', 
+                marker='o', label = 'training samples')
+    plt.scatter(fake_data[:,:1], fake_data[:,1:], alpha=0.5, color='blue', 
+                marker='o', label = 'samples by G')
+    plt.legend()
+    plt.grid(True)
+    if path_to_save is not None:
+        cur_time = datetime.datetime.now().strftime('%Y_%m_%d-%H_%M_%S')
+        plot_name = cur_time + f'_wgan_sampling_{epoch}_epoch.jpg'
+        path_to_plot = os.path.join(path_to_save, plot_name)
+        plt.savefig(path_to_plot)
+    else:
+        plt.show()
 
 
-def load_model(G, folder):
-    ckpt = torch.load(os.path.join(folder, 'G.pth'), map_location=torch.device('cpu') if not torch.cuda.is_available() else None)
-    G.load_state_dict({k.replace('module.', ''): v for k, v in ckpt.items()})
-    return G
+
+
+def save_models(G, D, folder, epoch):
+    torch.save(G.state_dict(), os.path.join(folder,f'G.pth_{epoch}'))
+    torch.save(D.state_dict(), os.path.join(folder,f'D.pth_{epoch}'))
+
+
+def load_model(model, folder, epoch=None):
+    if isinstance(model, m.Generator):
+        ckpt_path = os.path.join(folder, f"G.pth" if epoch is None else f"G.pth_{epoch}")
+    elif isinstance(model, m.Discriminator):
+        ckpt_path = os.path.join(folder, f"D.pth" if epoch is None else f"D.pth_{epoch}")
+    else:
+        raise ValueError("Model type not recognized. Expected m.Generator or m.Discriminator.")
+
+    ckpt = torch.load(ckpt_path, map_location=torch.device('cpu'))
+    model.load_state_dict({k.replace('module.', ''): v for k, v in ckpt.items()})
+    return model
+def imshow(img, title=None):
+    npimg = img.numpy()
+    if npimg.ndim == 2:  # Image en niveaux de gris
+        plt.imshow(npimg, cmap='gray')
+    else:  # Image en couleur
+        plt.imshow(np.transpose(npimg, (1, 2, 0)))
+    if title is not None:
+        plt.title(title, y=-0.05, fontsize=15)
+    plt.axis('off')
+    plt.show()
+
+def visualize_samples(folder, title, n_samples=225, grid_size=(15, 15)):
+    index_random = np.random.randint(0, 10000, n_samples)
+    image_files = sorted(os.listdir(folder))
+    selected_files = [image_files[i] for i in index_random]
+    images = []
+    transform = transforms.ToTensor()
+    
+    for file in selected_files:
+        img = Image.open(os.path.join(folder, file)).convert("L")  # Convertir en niveaux de gris
+        img_tensor = transform(img)  # Convertir en tenseur
+        images.append(img_tensor)
+    
+    # Créer une grille
+    grid = make_grid(images, nrow=grid_size[1], normalize=True, padding=2)
+    
+
+    # Afficher la grille
+    plt.figure(figsize=(15, 15))
+    plt.imshow(grid.permute(1, 2, 0), cmap='gray')  # Permuter pour HWC
+    plt.axis('off')
+    plt.title(title, fontsize=20)
+    plt.show()
+
+
+def plot_evolution(directory: str = "evolution_ddls", grid_size=(5, 10), max = 100):
+    images = []
+    transform = transforms.ToTensor()
+    for n in range(max + 1):
+        img = Image.open(os.path.join(directory,f"{n}.png")).convert("L")
+        img_tensor = transform(img)
+        images.append(img_tensor)
+    
+    # # Créer une grille
+    grid = make_grid(images, nrow=grid_size[1], normalize=True, padding=2)
+    
+    # Afficher la grille
+    plt.figure(figsize=(grid_size[1], grid_size[0]))
+    plt.imshow(grid.permute(1, 2, 0), cmap='gray')
+    plt.axis('off')
+    plt.title("Evolution of the generated images", fontsize=20)
+    plt.show()
+
+
+
+    
+if __name__ == '__main__':
+    visualize_samples('samples_gan_ddls', "WGAN-GP DDLS t = 82 steps = 800 lr = 0.0009")
+    # plot_evolution(max= 500)
