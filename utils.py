@@ -106,5 +106,5 @@ def plot_evolution(directory: str = "evolution_ddls", grid_size=(5, 10), max = 1
 
     
 if __name__ == '__main__':
-    visualize_samples('samples_gan_ddls', "WGAN-GP DDLS t = 82 steps = 800 lr = 0.0009")
+    visualize_samples('samples', "WGAN-GP DDLS t = 82 steps = 800 lr = 0.0009")
     # plot_evolution(max= 500)

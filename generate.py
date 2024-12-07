@@ -25,8 +25,8 @@ def cal_deriv(inputs, outputs, device):
     return grads
 
 def langevin_sampling(zs, z_dim, generator, discriminator, batch_size, 
-                      langevin_rate=0.0009, langevin_noise_std=0.1,
-                      langevin_steps=500, t=None, device="mps", 
+                      langevin_rate=0.001, langevin_noise_std=0.1,
+                      langevin_steps=500, t=None, device='cuda', 
                       store_prev=False, each_it_save=0,
                       decay=False):
 
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate Images with DDLS.')
     parser.add_argument("--batch_size", type=int, default=200,
                       help="The batch size to use for training.")
-    parser.add_argument("--langevin_steps", type=int, default=850,
+    parser.add_argument("--langevin_steps", type=int, default=1000,
                       help="Number of Langevin steps for latent refinement.")
     args = parser.parse_args()
 
@@ -117,7 +117,7 @@ if __name__ == '__main__':
     z_dim = 100
     loc = torch.zeros(z_dim).to(device)
     scale = torch.ones(z_dim).to(device)
-    normal = MN.Normal(loc, scale*2)
+    normal = MN.Normal(loc, scale*1.3)
     diagn = MN.Independent(normal, 1)
     
 
@@ -133,6 +133,7 @@ if __name__ == '__main__':
             decay= False,
             store_prev=False,
             each_it_save=100,
+            device = device
             )
             
         with torch.no_grad():
