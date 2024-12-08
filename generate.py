@@ -13,6 +13,7 @@ from torch import autograd
 import torch.distributions as MN
 from model import Generator, Discriminator
 from utils import load_model
+import utils
 
 
 def cal_deriv(inputs, outputs, device):
@@ -24,23 +25,23 @@ def cal_deriv(inputs, outputs, device):
                           only_inputs=True)[0]
     return grads
 
-def langevin_sampling(zs, z_dim, generator, discriminator, batch_size, 
+def langevin_sampling(zs, z_dim, generator, discriminator, batch_size,
                       langevin_rate=0.001, langevin_noise_std=0.1,
-                      langevin_steps=500, t=None, device='cuda', 
+                      langevin_steps=500, t=None, device='cuda',
                       store_prev=False, each_it_save=0,
-                      decay=False):
+                      decay=False, diversity_reg=20,
+                      temperature=5.0, wgan = False):
 
-    zs_init = zs.clone()
-    
+
     # Prior distribution initialization
     mean = torch.zeros(z_dim, device=device)
     prior_std = torch.eye(z_dim, device=device)
     lgv_std = prior_std * langevin_noise_std
     prior = MN.MultivariateNormal(loc=mean, covariance_matrix=prior_std)
-    
+
     if store_prev:
         history = [zs.clone()]
-    
+
     lgv_prior = MN.MultivariateNormal(loc=mean, covariance_matrix=lgv_std)
     for i in tqdm(range(langevin_steps)):
         zs = autograd.Variable(zs, requires_grad=True)
@@ -48,8 +49,18 @@ def langevin_sampling(zs, z_dim, generator, discriminator, batch_size,
         fake_dict = discriminator(fake_images)
 
         # Compute energy
- 
-        energy = -prior.log_prob(zs) - fake_dict
+        
+        if wgan:
+            energy = -fake_dict -diagn.log_prob(zs)
+        else:
+            energy = -prior.log_prob(zs) - fake_dict
+        
+        
+        # Diversity regularization using variance
+        # print(torch.var(zs, dim=0).mean())
+
+        diversity_loss = diversity_reg * torch.var(zs, dim=0).mean()
+        energy -= diversity_loss
         
         # Compute gradients
         z_grads = cal_deriv(inputs=zs, outputs=energy, device=device)
@@ -60,10 +71,10 @@ def langevin_sampling(zs, z_dim, generator, discriminator, batch_size,
             z_grads = z_grads * mask
         
         if decay:
-            langevin_rate = langevin_rate / (1 + i / langevin_steps)
+            langevin_rate = langevin_rate / (1 + 2*i / langevin_steps)
 
         # Update latent
-        zs = zs - 0.5 * langevin_rate * z_grads + (langevin_rate**0.5) * lgv_prior.sample([batch_size])
+        zs = zs - 0.5 * langevin_rate * z_grads + (langevin_rate**0.5) * lgv_prior.sample([batch_size]) * temperature
         
         
         if store_prev and i % each_it_save == 0:
@@ -80,7 +91,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate Images with DDLS.')
     parser.add_argument("--batch_size", type=int, default=200,
                       help="The batch size to use for training.")
-    parser.add_argument("--langevin_steps", type=int, default=1000,
+    parser.add_argument("--langevin_steps", type=int, default=500,
                       help="Number of Langevin steps for latent refinement.")
     args = parser.parse_args()
 
@@ -117,7 +128,7 @@ if __name__ == '__main__':
     z_dim = 100
     loc = torch.zeros(z_dim).to(device)
     scale = torch.ones(z_dim).to(device)
-    normal = MN.Normal(loc, scale*1.3)
+    normal = MN.Normal(loc, scale)
     diagn = MN.Independent(normal, 1)
     
 
@@ -129,7 +140,7 @@ if __name__ == '__main__':
             zs, z_dim, generator, discriminator, 
             batch_size=batch_size_,
             langevin_steps=args.langevin_steps,
-            t = 82,
+            t = 72,
             decay= False,
             store_prev=False,
             each_it_save=100,
@@ -143,4 +154,3 @@ if __name__ == '__main__':
                 if n_samples < 10000:
                     torchvision.utils.save_image(x[k:k+1], os.path.join('samples', f'{n_samples}.png'))         
                     n_samples += 1
-

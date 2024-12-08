@@ -61,7 +61,7 @@ def imshow(img, title=None):
     plt.show()
 
 def visualize_samples(folder, title, n_samples=225, grid_size=(15, 15)):
-    index_random = np.random.randint(0, 10000, n_samples)
+    index_random = np.random.randint(0, 1000, n_samples)
     image_files = sorted(os.listdir(folder))
     selected_files = [image_files[i] for i in index_random]
     images = []
