@@ -163,4 +163,3 @@ if __name__ == '__main__':
                 if n_samples < 10000:
                     torchvision.utils.save_image(x[k:k+1], os.path.join('samples', f'{n_samples}.png'))         
                     n_samples += 1
-                    
