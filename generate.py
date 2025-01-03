@@ -26,7 +26,7 @@ def cal_deriv(inputs, outputs, device):
     return grads
 
 def langevin_sampling(zs, z_dim, generator, discriminator, batch_size,
-                      langevin_rate=0.0001, langevin_noise_std=0.1,
+                      langevin_rate=0.00005, langevin_noise_std=0.1,
                       langevin_steps=500, t=None, device='cuda',
                       store_prev=False, each_it_save=0,
                       decay=False, diversity_reg=20,
@@ -63,13 +63,13 @@ def langevin_sampling(zs, z_dim, generator, discriminator, batch_size,
         # energy -= diversity_loss
         
         # Calculer la moyenne des distances de paire
-        mean_pairwise_distance = torch.mean(torch.pdist(zs, p=2))
+        # mean_pairwise_distance = torch.mean(torch.pdist(zs, p=2))
 
-        # Calculer la perte de diversité en utilisant l'inverse de la moyenne des distances
-        diversity_loss = diversity_reg / (mean_pairwise_distance + 1e-8) 
+        # # Calculer la perte de diversité en utilisant l'inverse de la moyenne des distances
+        # diversity_loss = diversity_reg / (mean_pairwise_distance + 1e-8) 
         
-        # Ajouter la perte de diversité à l'énergie
-        energy += diversity_loss
+        # # Ajouter la perte de diversité à l'énergie
+        # energy += diversity_loss
         
         # Compute gradients
         z_grads = cal_deriv(inputs=zs, outputs=energy, device=device)
@@ -142,7 +142,7 @@ if __name__ == '__main__':
     
 
   
-    while n_samples < 10000:
+    while n_samples < 1000:
         zs = diagn.sample([batch_size_]).to(device)
         # Refine latents with DDLS
         zs_refined = langevin_sampling(
@@ -160,6 +160,8 @@ if __name__ == '__main__':
             x = generator(zs_refined)
             x = x.reshape(batch_size_, 28, 28)
             for k in range(x.shape[0]):
-                if n_samples < 10000:
+                if n_samples < 1000:
                     torchvision.utils.save_image(x[k:k+1], os.path.join('samples', f'{n_samples}.png'))         
                     n_samples += 1
+
+utils.visualize_samples('samples', 'samples.png')
